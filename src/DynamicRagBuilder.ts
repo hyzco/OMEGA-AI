@@ -88,21 +88,23 @@ export default class DynamicRAGBuilder extends RAG {
   constructor() {
     super();
 
-    this.webSocketModule = new WebSocketModule(5555);
+    this.webSocketModule = new WebSocketModule(
+      Number(process.env.WEB_SOCKET_PORT) || 5555
+    );
     this.webSocketModule.initializeWebSocket(
       this.handleWebSocketMessage.bind(this)
     );
   }
 
   // Generic Message Handling
-  private async handleWebSocketMessage(
+  protected async handleWebSocketMessage(
     message: WebSocketMessage,
     ws: WebSocket
   ) {
     try {
       const sessionId = uuidv4();
       this.activeSessions.set(sessionId, ws);
-
+      console.log("Handling WebSocket message:", message);
       switch (message.type) {
         case "EXECUTE_TOOL":
           await this.handleToolExecution(message, sessionId);
@@ -124,16 +126,22 @@ export default class DynamicRAGBuilder extends RAG {
 
   // Tool Execution
   protected async executeTool(toolName: string, input: any) {
+    console.log("Executing tool:", toolName);
     const tool = this.toolRegistry.getTool(toolName);
     tool.interface.toolArgs = input;
+
+    console.log("Tool:", tool);
 
     if (!tool) throw new Error(`Tool ${toolName} not found`);
     // Validate input against schema
     const validate = ajv.compile(tool.inputSchema);
     if (!validate(input)) {
+      console.log("Invalid input:", input);
       throw new Error(
         `Invalid input for tool ${toolName}: ${JSON.stringify(validate.errors)}`
       );
+    }else{
+      console.log("Validated input:", input);
     }
 
     // Execute tool
@@ -378,9 +386,12 @@ export default class DynamicRAGBuilder extends RAG {
     message: WebSocketMessage,
     sessionId: string
   ) {
+    console.log("Handling tool execution:", message);
     const { toolName, input } = message.data;
     try {
       const result = await this.executeTool(toolName, input);
+      this.webSocketModule.sendIterableReadableStream(result);
+
       this.sendSuccess(sessionId, result);
     } catch (error) {
       this.sendError(sessionId, error.message);

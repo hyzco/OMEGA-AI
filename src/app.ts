@@ -17,20 +17,20 @@ class App extends ContentAI {
     let i = 0;
     while (i < 10) {
       const input = await super.getUserInput();
-      const workflow = this.getWorkflowByName("default_content_generation");
+      // const workflow = this.getWorkflowByName("default_content_generation");
 
 
 
-      await this.executeWorkflow(workflow.id, {
-        topic: "AI in finance",
-        keywords: "blockchain, trading, risk analysis",
-        meta: {
-          wordCount: 300,
-          tone: "professional",
-          style: "analytical",
-          language: "en",
-        },
-      });
+      // await this.executeWorkflow(workflow.id, {
+      //   topic: "AI in finance",
+      //   keywords: "blockchain, trading, risk analysis",
+      //   meta: {
+      //     wordCount: 300,
+      //     tone: "professional",
+      //     style: "analytical",
+      //     language: "en",
+      //   },
+      // });
 
       // console.log(await this.convertResponseToString(workflowResult));
       // this.webSocketModule.sendIterableReadableStream(ideas);
