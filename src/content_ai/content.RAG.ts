@@ -1,231 +1,150 @@
-import {
-  HumanMessage,
-  AIMessage,
-  SystemMessage,
-} from "@langchain/core/messages";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
-import { ChatOllama } from "@langchain/ollama";
-import CassandraVectorDatabase from "../database/CassandraVectorDatabase";
-import AiTools, { ITool } from "../modules/aiTools/AiTools";
-import NoteManagementPlugin from "../plugins/NoteManagement.plugin";
-import RAG from "../RAG";
-import AiToolsModule from "../modules/aiTools/AiToolsModule";
-import ToolRegistry, { Registry } from "../modules/aiTools/ToolRegistry";
-import ContentAiTools from "./modules/ContentAiTools";
+import DynamicRAGBuilder from "../DynamicRagBuilder";
 import ContentAiToolHandlers from "./modules/ContentAiToolHandlers";
-import logger from "../utils/Logger";
-import WebSocketModule, { WebSocketMessage } from "../modules/WebSocketModule";
+import ContentAiTools from "./modules/ContentAiTools";
 
-export default class ContentAI extends RAG {
-  protected webSocketModule: WebSocketModule;
-
-  protected aiToolsModule: AiToolsModule;
-  private readonly toolRegistry = new ToolRegistry();
+export class ContentAI extends DynamicRAGBuilder {
   private readonly contentAiToolHandlers: ContentAiToolHandlers;
 
   constructor() {
     super();
-    this.webSocketModule = new WebSocketModule(5555);
-    this.webSocketModule.initializeWebSocket(
-      this.handleWebSocketMessage.bind(this)
-    );
-
-    const tools = new ContentAiTools();
     this.contentAiToolHandlers = new ContentAiToolHandlers(this);
+    this.initializeContentTools();
+    this.createDefaultWorkflows();
+  }
+
+  private initializeContentTools() {
+    const tools = new ContentAiTools();
+    const ideaTool = tools.getTool("content_idea_generator");
+    const contentTool = tools.getTool("content_production");
     this.setAiTools(tools);
 
-    // Registering tools and handlers
-    const toolRegistries = [
-      {
-        tool: tools.getTool("content_idea_generator"),
-        handler: this.contentAiToolHandlers.handleContentIdeaGeneratorTool.bind(
-          this.contentAiToolHandlers
-        ),
-      } as Registry,
-      {
-        tool: tools.getTool("content_production"),
-        handler: this.contentAiToolHandlers.handleContentProductionTool.bind(
-          this.contentAiToolHandlers
-        ),
-      } as Registry,
-    ];
+    // Register content-specific tools
+    this.toolRegistry.registerTool({
+      interface: ideaTool,
+      inputSchema: {
+        type: "object",
+        properties: {
+          topic: { type: "string" },
+          keywords: { type: "string" },
+        },
+        required: ["topic", "keywords"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          ideas: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                title: { type: "string" },
+                description: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+      handler: this.contentAiToolHandlers.handleContentIdeaGeneratorTool.bind(
+        this.contentAiToolHandlers
+      ),
+    });
 
-    toolRegistries.forEach((registry: Registry) => {
-      this.toolRegistry.registerTool(registry);
+    this.toolRegistry.registerTool({
+      interface: contentTool,
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          keywords: { type: "array" },
+          meta: {
+            type: "object",
+            properties: {
+              wordCount: { type: "number", minimum: 100 },
+              tone: { type: "string" },
+              style: { type: "string" },
+              language: { type: "string" },
+            },
+            required: ["wordCount", "tone", "style", "language"],
+          },
+        },
+        required: ["title", "keywords", "meta"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          content: { type: "string" },
+          meta: {
+            type: "object",
+            properties: {
+              wordCount: { type: "number" },
+              tone: { type: "string" },
+              style: { type: "string" },
+              language: { type: "string" },
+              keywords: { type: "array" },
+            },
+          },
+        },
+      },
+      handler: this.contentAiToolHandlers.handleContentProductionTool.bind(
+        this.contentAiToolHandlers
+      ),
     });
   }
 
-  /**
-   * Handles incoming messages from the WebSocket server
-   */
-
-  public async handleWebSocketMessage(
-    message: WebSocketMessage,
-    ws: WebSocket
-  ) {
-    try {
-      if (message.type === "PRODUCE_IDEA") {
-        const response = await this.produceContentIdeas(message.data);
-        this.webSocketModule.sendIterableReadableStream(response);
-      } else if (message.type === "PRODUCE_CONTENT") {
-        const response = await this.produceContent(message.data);
-        this.webSocketModule.sendIterableReadableStream(response);
-      }
-    } catch (error) {
-      logger.error("Error in handleWebSocketMessage:", error);
-    }
+  private createDefaultWorkflows() {
+    // Create default content generation workflow
+    this.toolRegistry.createWorkflow({
+      name: "default_content_generation",
+      description: "Standard content generation workflow",
+      steps: [
+        {
+          toolName: "content_idea_generator",
+          inputMapping: {
+            topic: "input.topic",
+            keywords: "input.keywords",
+          },
+        },
+        {
+          toolName: "content_production",
+          inputMapping: {
+            title: "output.ideas[0].idea", //$index to process multiple ideas
+            keywords: "output.ideas[0].keywords", //$index to process multiple ideas
+            meta: "input.meta",
+          },
+        },
+      ],
+    });
   }
 
-  /**
-   * Creates content ideas using the "content_idea_generator" tool
-   */
-  protected async produceContentIdeas(
+  // Preserve existing methods for backward compatibility
+  public async produceContentIdeas(
     userInput: string | any
   ): Promise<IterableReadableStream<string>> {
-    try {
-      // Retrieve user input
-      if (!userInput) {
-        throw new Error("No user input provided.");
-      }
-      console.log("userInput", userInput);
-
-      if (!userInput.topic || !userInput.keywords) {
-        throw new Error("Topic and keywords must be provided.");
-      }
-
-      if (
-        typeof userInput.topic !== "string" ||
-        typeof userInput.keywords !== "string"
-      ) {
-        throw new Error("Invalid arguments provided.");
-      }
-
-      if (userInput.topic.length < 1 || userInput.keywords.length < 1) {
-        throw new Error("Invalid arguments provided.");
-      }
-
-      // Retrieve tool and execute it
-      const { tool, handler } = this.toolRegistry.getTool(
-        "content_idea_generator"
-      );
-      if (!tool) {
-        throw new Error(
-          "Tool 'content_idea_generator' not found in the registry."
-        );
-      }
-
-      const toolArgs = {
-        topic: userInput.topic,
-        keywords: userInput.keywords,
-      };
-
-      tool.toolArgs = toolArgs;
-
-      const response = await handler(tool);
-
-      if (response) {
-        return response;
-      } else {
-        logger.warn("No response received from the 'content_generator' tool.");
-      }
-    } catch (error) {
-      logger.error("Error in createContentIdeas:", error);
-    }
+    return this.executeTool("content_idea_generator", {
+      topic: userInput.topic,
+      keywords: userInput.keywords,
+    });
   }
 
-  /**
-   * Generates detailed content using the "content_production" tool
-   */
-  protected async produceContent(
+  public async produceContent(
     userInput: any
   ): Promise<IterableReadableStream<string>> {
-    try {
-      // Ensure userInput exists.
-      if (!userInput) {
-        throw new Error("No user input provided.");
-      }
+    return this.executeTool("content_production", {
+      title: userInput.title,
+      keywords: userInput.keywords,
+      meta: {
+        wordCount: userInput.meta.wordCount,
+        tone: userInput.meta.tone,
+        style: userInput.meta.style,
+        language: userInput.meta.language,
+      },
+    });
+  }
 
-      console.log("userInput", userInput);
-
-      // Validate required fields: topic and keywords.
-      if (!userInput.title || !userInput.keywords) {
-        throw new Error("Title and keywords must be provided.");
-      }
-      if (
-        typeof userInput.title !== "string" ||
-        typeof userInput.keywords !== "string"
-      ) {
-        throw new Error(
-          "Invalid arguments provided. Title and keywords must be strings."
-        );
-      }
-      if (
-        userInput.title.trim().length < 1 ||
-        userInput.keywords.trim().length < 1
-      ) {
-        throw new Error(
-          "Invalid arguments provided. Topic and keywords cannot be empty."
-        );
-      }
-
-      if (!userInput.meta) {
-        throw new Error("Meta properties must be provided.");
-      }
-
-      // Extract meta properties from userInput.
-      const { wordCount, tone, style, language } = userInput.meta;
-
-      // Validate meta properties.
-      if (typeof wordCount !== "number" || wordCount < 0) {
-        throw new Error(
-          "Invalid wordCount provided. It must be a non-negative number."
-        );
-      }
-      if (typeof tone !== "string" || tone.trim().length < 1) {
-        throw new Error("Invalid tone provided.");
-      }
-      if (typeof style !== "string" || style.trim().length < 1) {
-        throw new Error("Invalid style provided.");
-      }
-      if (typeof language !== "string" || language.trim().length < 1) {
-        throw new Error("Invalid language provided.");
-      }
-
-      // Retrieve the 'content_production' tool from the registry.
-
-      const { tool, handler } = this.toolRegistry.getTool("content_production");
-      if (!tool) {
-        throw new Error(
-          "Tool 'content_idea_generator' not found in the registry."
-        );
-      }
-
-      // Set up the tool arguments using userInput values.
-      const toolArgs = {
-        title: userInput.title, // Using topic as the title.
-        meta: {
-          wordCount, // coming from userInput.
-          tone, // coming from userInput.
-          style, // coming from userInput.
-          language, // coming from userInput.
-        },
-        keywords: userInput.keywords,
-      };
-
-      // Assign tool arguments.
-      tool.toolArgs = toolArgs;
-
-      // Execute the tool's handler with the tool (including its arguments) and userInput.
-      const response = await handler(tool);
-      
-      if (response) {
-        return response;
-      } else {
-        logger.warn("No response received from the 'content_production' tool.");
-      }
-    } catch (error) {
-      logger.error("Error in produceContent:", error);
-      throw error; // Rethrow error for further handling if necessary.
-    }
+  // Add helper method to find workflow by name
+  public getWorkflowByName(name: string) {
+    return this.toolRegistry.getWorkflowByName(name);
   }
 }

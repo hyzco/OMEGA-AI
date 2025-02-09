@@ -1,16 +1,12 @@
-import { SystemMessage, HumanMessage } from "@langchain/core/messages";
+import { SystemMessage } from "@langchain/core/messages";
 import { ITool } from "../../modules/aiTools/AiTools";
-import NoteManagementPlugin, {
-  INote,
-} from "../../plugins/NoteManagement.plugin";
-import Api, { ApiMethods } from "../../utils/Api";
 import logger from "../../utils/Logger";
-import ContentAI from "../content.RAG";
+import DynamicRAGBuilder from "../../DynamicRagBuilder";
 
 export default class ContentAiToolHandlers {
-  protected ragInstance: ContentAI;
+  protected ragInstance: DynamicRAGBuilder;
 
-  constructor(ragInstance: ContentAI) {
+  constructor(ragInstance: DynamicRAGBuilder) {
     if (!ragInstance) {
       throw new Error(
         "Invalid ContentAI instance provided to ContentAiToolHandlers."
@@ -26,6 +22,7 @@ export default class ContentAiToolHandlers {
    */
   public async handleContentIdeaGeneratorTool(toolJson: ITool) {
     try {
+      console.log("toolJson", toolJson);
       const topic = toolJson.toolArgs.topic;
       const keywords = toolJson.toolArgs.keywords;
 
@@ -39,6 +36,7 @@ export default class ContentAiToolHandlers {
       const generatedPrompt = this.ragInstance.generatePrompt([
         new SystemMessage(JSON.stringify(toolJson), { topic, keywords }),
       ]);
+      console.log("generatedPrompt", generatedPrompt);
       const response = await this.ragInstance.invokePrompt(generatedPrompt);
       logger.info("Generated content ideas successfully.");
       return response;

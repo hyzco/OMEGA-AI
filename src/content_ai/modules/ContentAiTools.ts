@@ -25,9 +25,9 @@ export default class ContentAiTools extends AiTools<ITool> {
     return [
       "Ideas must be user-focused, SEO-friendly, and categorized under user defined topic.",
       "Generated ideas should always return structured JSON in the following format:",
-      `[ 
+      `{ideas: [ 
         { "idea": "string", "category": "string", "keywords": ["string", "string", "string"]} 
-      ]`,
+    ]}`,
       "Exactly 5 ideas must be generated per request.",
     ];
   }
