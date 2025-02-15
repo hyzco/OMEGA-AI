@@ -14,7 +14,6 @@ import { CassandraClient } from "./database/CassandraClient";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
 import logger from "./utils/Logger";
 import inquirer, { PromptModule } from "inquirer";
-import { extractJSON } from "./utils/JSON";
 
 export default class RAG {
   protected inquirer: PromptModule;
@@ -104,43 +103,6 @@ export default class RAG {
     }
   }
 
-  protected async convertResponseToString(
-    response: string | IterableReadableStream<string | BaseMessageChunk>,
-    isJSON = false
-  ) {
-    let responseString = "";
-    let buffer = "";
-
-    for await (const chunk of response) {
-      const chunkContent =
-        typeof chunk === "string" ? chunk : (chunk as BaseMessageChunk).content;
-
-      buffer += chunkContent;
-
-      process.stdout.write(buffer.toString()); // Output only processed content
-      responseString += buffer;
-      buffer = ""; // Clear buffer after processing
-    }
-
-    console.log();
-
-    if (isJSON) {
-      responseString = extractJSON(responseString);
-    }
-
-    return responseString;
-  }
-
-  protected convertResponseToStream(
-    response: string
-  ): IterableReadableStream<string> {
-    return new IterableReadableStream<string>({
-      start(controller) {
-        controller.enqueue(response);
-        controller.close();
-      },
-    });
-  }
   protected removeThinkTag(response: string): string {
     return response.replace(/<think>.*?<\/think>/gs, ""); // Remove think blocks in string responses
   }

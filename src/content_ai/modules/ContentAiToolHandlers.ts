@@ -38,7 +38,6 @@ export default class ContentAiToolHandlers {
       ]);
       console.log("generatedPrompt", generatedPrompt);
       const response = await this.ragInstance.invokePrompt(generatedPrompt);
-      logger.info("Generated content ideas successfully.");
       return response;
     } catch (error) {
       logger.error(`Error in handleContentIdeaGeneratorTool: ${error.message}`);
@@ -74,7 +73,6 @@ export default class ContentAiToolHandlers {
         new SystemMessage(JSON.stringify(toolJson), toolJson.toolArgs),
       ]);
       const response = await this.ragInstance.invokePrompt(generatedPrompt);
-      console.log("response", response);
 
       logger.info("Content produced successfully.");
       return response;

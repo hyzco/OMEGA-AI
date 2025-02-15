@@ -2,10 +2,6 @@ import WebSocket, { WebSocketServer } from "ws";
 import logger from "../utils/Logger";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
 
-interface TranscribedData {
-  chunks: any[]; // Adjust as per your actual data structure
-}
-
 export interface WebSocketMessage {
   type: string;
   data: any;
@@ -18,20 +14,16 @@ interface Client {
 
 export default class WebSocketModule {
   private socket: WebSocketServer | null = null;
-  // Optionally keep track of clients with IDs if needed
   private clients: Client[] = [];
-  private transcribedChunk: any;
 
-  constructor(private port: number) {
-    // No need to reassign this.port here since it's declared in the constructor parameter.
-  }
+  constructor(private port: number) {}
 
   /**
    * Initializes the WebSocket server.
    * @param customCallback Optional callback to handle incoming messages.
    */
   public initializeWebSocket(
-    customCallback?: (message: WebSocketMessage) => void
+    customCallback?: (message: WebSocketMessage, ws: WebSocket) => void
   ) {
     if (this.socket) {
       logger.warn("WebSocket server is already initialized.");
@@ -65,15 +57,14 @@ export default class WebSocketModule {
 
       // Generate a simple client ID (consider using a robust method like UUID for production)
       const clientId = Math.random().toString(36).substring(7);
+      (ws as any).clientId = clientId; // Attach clientId to the ws object
       this.clients.push({ id: clientId, ws });
 
       // Handle incoming messages
       ws.on("message", (message: WebSocket.Data) => {
-        console.log("Received message:", message.toString());
+        logger.log("Received message:", message.toString());
         try {
-          const parsedMessage = JSON.parse(
-            message.toString()
-          ) as WebSocketMessage;
+          const parsedMessage = JSON.parse(message.toString()) as WebSocketMessage;
           this.handleWebSocketMessage(parsedMessage, ws, customCallback);
         } catch (error) {
           logger.error("Error parsing incoming WebSocket message:", error);
@@ -93,20 +84,28 @@ export default class WebSocketModule {
   }
 
   /**
-   * Sends an IterableReadableStream to all connected clients.
+   * Sends an IterableReadableStream to the specified client.
+   * @param sessionId The client's session id.
    * @param stream The stream to send.
    */
   public async sendIterableReadableStream(
+    sessionId: string,
     stream: IterableReadableStream<string>
   ) {
     if (!stream) return;
+    const client = this.clients.find((c) => c.id === sessionId);
+    if (!client) {
+      throw new Error(`Client with sessionId ${sessionId} not found`);
+    }
 
     try {
       for await (const chunk of stream) {
-        this.sendMessageToClients({ type: "STREAM_CHUNK", data: chunk });
+        this.sendMessageToClient(sessionId, {
+          type: "STREAM_CHUNK",
+          data: chunk,
+        });
       }
-      // Optionally, you can signal the end of the stream:
-      // this.sendMessageToClients({ type: "STREAM_END", data: "Stream ended" });
+      // Optionally, signal the end of the stream here.
     } catch (error) {
       logger.error("Error sending stream data:", error);
     }
@@ -123,6 +122,18 @@ export default class WebSocketModule {
           client.send(JSON.stringify(message));
         }
       }
+    }
+  }
+
+  /**
+   * Sends a message to a specific client identified by sessionId.
+   * @param sessionId The client's session id.
+   * @param message The message object to send.
+   */
+  public sendMessageToClient(sessionId: string, message: any) {
+    const client = this.clients.find((c) => c.id === sessionId);
+    if (client && client.ws.readyState === WebSocket.OPEN) {
+      client.ws.send(JSON.stringify(message));
     }
   }
 
@@ -151,13 +162,14 @@ export default class WebSocketModule {
   private handleWebSocketMessage(
     message: WebSocketMessage,
     ws: WebSocket,
-    customCallback?: (msg: WebSocketMessage) => void
+    customCallback?: (message: WebSocketMessage, ws: WebSocket) => void
   ) {
-    console.log("Handling WebSocket message:", message);
+    logger.log("Handling WebSocket message:", message);
     if (customCallback) {
-      console.log("Using custom callback to handle message.");
-      customCallback(message);
+      logger.log("Using custom callback to handle message.");
+      customCallback(message, ws);
     } else {
+      // Default handling for messages without a custom callback.
       switch (message.type) {
         case "TRANSCRIBED_DATA":
           this.handleTranscribedData(message.data);
@@ -171,29 +183,19 @@ export default class WebSocketModule {
     }
   }
 
-  /**
-   * Processes full transcribed data.
-   * @param data The transcribed data.
-   */
   private handleTranscribedData(data: string) {
     logger.log("Received transcribed data:", data);
-    this.transcribedChunk = data;
-    // Process the full transcribed data as needed
+    // Process the full transcribed data as needed.
   }
 
-  /**
-   * Processes a transcribed chunk.
-   * @param chunk The chunk of transcribed data.
-   */
   private async handleTranscribedChunk(chunk: any) {
     try {
       logger.log("Received transcribed chunk:", chunk);
       if (chunk.text) {
-        this.transcribedChunk = chunk.text.trim();
+        // Process the chunk if needed.
       } else {
         logger.warn("Chunk does not contain 'text' property:", chunk);
       }
-      // Optionally process the chunk further here
     } catch (error) {
       logger.error("Error handling transcribed chunk:", error);
     }

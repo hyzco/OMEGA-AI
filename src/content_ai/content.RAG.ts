@@ -122,7 +122,7 @@ export class ContentAI extends DynamicRAGBuilder {
   public async produceContentIdeas(
     userInput: string | any
   ): Promise<IterableReadableStream<string>> {
-    return this.executeTool("content_idea_generator", {
+    return this.toolExecutor.executeTool("content_idea_generator", {
       topic: userInput.topic,
       keywords: userInput.keywords,
     });
@@ -131,7 +131,7 @@ export class ContentAI extends DynamicRAGBuilder {
   public async produceContent(
     userInput: any
   ): Promise<IterableReadableStream<string>> {
-    return this.executeTool("content_production", {
+    return this.toolExecutor.executeTool("content_production", {
       title: userInput.title,
       keywords: userInput.keywords,
       meta: {
