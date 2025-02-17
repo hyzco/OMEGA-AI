@@ -49,10 +49,15 @@ export class WebSocketHandler {
     message: WebSocketMessage,
     sessionId: string
   ) {
-    const { toolName, input } = message.data;
+    const { toolName, input, stream } = message.data;
     try {
-      const result = await this.toolExecutor.executeTool(toolName, input);
-      this.sendSuccessStream(sessionId, result);
+      if (stream) {
+        const result = await this.toolExecutor.executeTool(toolName, input);
+        this.sendSuccessStream(sessionId, result);
+      } else {
+        const result = await this.toolExecutor.executeToolWithJsonOutput(toolName, input);
+        this.sendSuccess(sessionId, result);
+      }
     } catch (error: any) {
       this.sendError(sessionId, error.message);
     }
@@ -64,7 +69,10 @@ export class WebSocketHandler {
   ) {
     const { workflowId, input } = message.data;
     try {
-      const result = await this.workflowManager.executeWorkflow(workflowId, input);
+      const result = await this.workflowManager.executeWorkflow(
+        workflowId,
+        input
+      );
       this.sendSuccess(sessionId, result);
     } catch (error: any) {
       this.sendError(sessionId, error.message);
@@ -87,13 +95,19 @@ export class WebSocketHandler {
    * Sends a success response to the client.
    */
   private sendSuccess(sessionId: string, data: any) {
-    this.webSocketModule.sendMessageToClient(sessionId, { status: "success", data });
+    this.webSocketModule.sendMessageToClient(sessionId, {
+      status: "success",
+      data,
+    });
   }
 
   /**
    * Sends a stream (as multiple messages) to the client.
    */
-  private async sendSuccessStream(sessionId: string, stream: IterableReadableStream<string>) {
+  private async sendSuccessStream(
+    sessionId: string,
+    stream: IterableReadableStream<string>
+  ) {
     await this.webSocketModule.sendIterableReadableStream(sessionId, stream);
   }
 
@@ -101,7 +115,10 @@ export class WebSocketHandler {
    * Sends an error response to the client.
    */
   private sendError(sessionId: string, message: string) {
-    this.webSocketModule.sendMessageToClient(sessionId, { status: "error", message });
+    this.webSocketModule.sendMessageToClient(sessionId, {
+      status: "error",
+      message,
+    });
   }
 
   /**

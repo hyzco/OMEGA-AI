@@ -8,7 +8,7 @@ import { WebSocketHandler } from "./modules/WebSocketHandler";
 export default class DynamicRAGBuilder extends RAG {
   protected readonly toolRegistry: ToolRegistry;
   protected readonly toolExecutor: ToolExecutor;
-  private readonly workflowManager: WorkflowManager;
+  protected readonly workflowManager: WorkflowManager;
   private readonly webSocketModule: WebSocketModule;
   private readonly webSocketHandler: WebSocketHandler;
 

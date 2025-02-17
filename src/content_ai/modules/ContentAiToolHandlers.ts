@@ -17,7 +17,6 @@ export default class ContentAiToolHandlers {
 
   /**
    * Handles Content Idea Generation Tool
-   * @param userInput - User-provided input for generating content ideas.
    * @param toolJson - Tool configuration and arguments.
    */
   public async handleContentIdeaGeneratorTool(toolJson: ITool) {
@@ -47,7 +46,6 @@ export default class ContentAiToolHandlers {
 
   /**
    * Handles Content Production Tool
-   * @param userInput - User-provided input for producing detailed content.
    * @param toolJson - Tool configuration and arguments.
    */
   public async handleContentProductionTool(toolJson: ITool) {
@@ -78,6 +76,63 @@ export default class ContentAiToolHandlers {
       return response;
     } catch (error) {
       logger.error(`Error in handleContentProductionTool: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Handles Generate Meta Description Tool
+   * @param toolJson - Tool configuration and arguments.
+   */
+  public async handleGenerateMetaDesc(toolJson: ITool) {
+    try {
+      console.log("toolJson", toolJson);
+      const { title, keywords, content } = toolJson.toolArgs;
+      if (!title || !keywords || !content) {
+        throw new Error(
+          "Title, keywords and content must be provided for content production."
+        );
+      }
+
+      console.log("handling handleGenerateMetaDesc tool");
+
+      const generatedPrompt = this.ragInstance.generatePrompt([
+        new SystemMessage(JSON.stringify(toolJson), toolJson.toolArgs),
+      ]);
+      const response = await this.ragInstance.invokePrompt(generatedPrompt);
+
+      logger.info("Content meta desc generated successfully.");
+      return response;
+    } catch (error) {
+      logger.error(`Error in handleGenerateMetaDesc: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Handles Content Title Improvement Tool
+   * @param toolJson - Tool configuration and arguments.
+   */
+  public async handleContentTitleImprovementTool(toolJson: ITool) {
+    try {
+      // Placeholder for future implementation
+      const { content } = toolJson.toolArgs;
+      if (!content) {
+        throw new Error("Content must be provided for title improvement.");
+      }
+
+      logger.info("Improving content title...");
+      const generatedPrompt = this.ragInstance.generatePrompt([
+        new SystemMessage(JSON.stringify(toolJson), toolJson.toolArgs),
+      ]);
+      const response = await this.ragInstance.invokePrompt(generatedPrompt);
+      logger.info("Content titles are improved.");
+
+      return response;
+    } catch (error) {
+      logger.error(
+        `Error in handleContentTitleImprovementTool: ${error.message}`
+      );
       throw error;
     }
   }

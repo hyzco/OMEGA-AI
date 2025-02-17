@@ -17,6 +17,9 @@ export class ContentAI extends DynamicRAGBuilder {
     const tools = new ContentAiTools();
     const ideaTool = tools.getTool("content_idea_generator");
     const contentTool = tools.getTool("content_production");
+    const titleImprove = tools.getTool("content_title_improver");
+    const generateMetaDesc = tools.getTool("meta_description_generator");
+
     this.setAiTools(tools);
 
     // Register content-specific tools
@@ -91,6 +94,51 @@ export class ContentAI extends DynamicRAGBuilder {
         this.contentAiToolHandlers
       ),
     });
+
+    this.toolRegistry.registerTool({
+      interface: titleImprove,
+      inputSchema: {
+        type: "object",
+        properties: {
+          content: { type: "string" },
+        },
+        required: ["content"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          content: { type: "string" },
+        },
+      },
+      handler:
+        this.contentAiToolHandlers.handleContentTitleImprovementTool.bind(
+          this.contentAiToolHandlers
+        ),
+    });
+
+    this.toolRegistry.registerTool({
+      interface: generateMetaDesc,
+      inputSchema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          keywords: { type: "array" },
+          content: { type: "string" },
+        },
+        required: ["title", "keywords", "content"],
+      },
+      outputSchema: {
+        type: "object",
+        properties: {
+          keywords: { type: "array" },
+          metaDesc: { type: "string" },
+        },
+      },
+      handler:
+        this.contentAiToolHandlers.handleContentTitleImprovementTool.bind(
+          this.contentAiToolHandlers
+        ),
+    });
   }
 
   private createDefaultWorkflows() {
@@ -112,6 +160,12 @@ export class ContentAI extends DynamicRAGBuilder {
             title: "output.ideas[0].idea", //$index to process multiple ideas
             keywords: "output.ideas[0].keywords", //$index to process multiple ideas
             meta: "input.meta",
+          },
+        },
+        {
+          toolName: "content_title_improver",
+          inputMapping: {
+            content: "input.content",
           },
         },
       ],

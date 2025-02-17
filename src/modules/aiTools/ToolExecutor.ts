@@ -2,6 +2,7 @@ import Ajv from "ajv";
 import { ToolRegistry } from "./ToolRegistry";
 import { IterableReadableStream } from "@langchain/core/utils/stream";
 import { convertResponseToString } from "../../utils/Stream";
+import { extractJSON } from "../../utils/JSON";
 
 const ajv = new Ajv();
 
@@ -39,5 +40,18 @@ export class ToolExecutor {
       );
     }
     return result;
+  }
+
+  async executeToolWithStringOutput(
+    toolName: string,
+    input: any
+  ): Promise<string> {
+    const stream = await this.executeTool(toolName, input);
+    return convertResponseToString(stream);
+  }
+
+  async executeToolWithJsonOutput(toolName: string, input: any): Promise<object> {
+    const stream = await this.executeTool(toolName, input);
+    return extractJSON(await convertResponseToString(stream));
   }
 }

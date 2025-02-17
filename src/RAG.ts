@@ -1,4 +1,6 @@
 import { ChatOllama } from "@langchain/ollama";
+import { ChatOpenAI } from "@langchain/openai";
+
 import {
   HumanMessage,
   AIMessage,
@@ -20,7 +22,7 @@ export default class RAG {
 
   protected aiTools: AiTools<ITool>;
   protected noteManagementPlugin: NoteManagementPlugin;
-  protected chatModel: ChatOllama;
+  protected chatModel: ChatOllama | ChatOpenAI;
   protected conversationHistory: (HumanMessage | AIMessage | SystemMessage)[];
   protected dialogRounds: number;
   protected vectorDatabase: CassandraVectorDatabase;
@@ -44,13 +46,22 @@ export default class RAG {
     console.timeEnd("RAG constructor");
   }
 
-  async build(): Promise<ChatOllama> {
+  async build(isOpenAI: boolean): Promise<ChatOllama | ChatOpenAI> {
     console.time("Chat model build");
     try {
-      this.chatModel = new ChatOllama({
-        baseUrl: process.env.OLLAMA_HOST,
-        model: process.env.DEFAULT_MODEL,
-      });
+      if (isOpenAI) {
+        this.chatModel = new ChatOpenAI({
+          apiKey: process.env.OPENAI_API_KEY,
+          model: process.env.DEFAULT_MODEL,
+        });
+      } else {
+        this.chatModel = new ChatOllama({
+          baseUrl: process.env.OLLAMA_HOST,
+          model: process.env.DEFAULT_MODEL,
+          numPredict: 2048,
+          numCtx: 8196,
+        });
+      }
       logger.info("Chat model is built.");
     } catch (error) {
       logger.error("Chat model could not be built: ", error);

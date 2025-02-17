@@ -39,3 +39,17 @@ export const convertResponseToStream = async (
     },
   });
 };
+
+export const streamToObject = async (stream: ReadableStream): Promise<any> => {
+  const reader = stream.getReader();
+  let result = "";
+  let done = false;
+
+  while (!done) {
+    const { value, done: streamDone } = await reader.read();
+    if (value) result += new TextDecoder().decode(value);
+    done = streamDone;
+  }
+
+  return JSON.parse(result);
+};
