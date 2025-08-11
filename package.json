@@ -1,5 +1,5 @@
 {
-  "name": "eva",
+  "name": "OMEGA-AI (EVA)",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
@@ -8,9 +8,9 @@
   },
   "type": "module",
   "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "author": "Hasan Ali Yuzgec <https://github.com/hyzco>",
+  "license": "Apache-2.0",
+  "description": "Dynamic RAG Application Generator",
   "dependencies": {
     "@langchain/community": "^0.3.29",
     "@langchain/core": "^0.3.39",
