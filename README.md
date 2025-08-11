@@ -1,3 +1,5 @@
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
 If you clone and you like, please don't forget to give me star! ⭐⭐⭐⭐⭐ Feel free to start a discussion ! :)
 
 # LLM-Rag-Application
@@ -145,4 +147,5 @@ Feel free to fork the repository and submit pull requests. For major changes, pl
 
 ### License
 
-This project is licensed under the MIT License
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
